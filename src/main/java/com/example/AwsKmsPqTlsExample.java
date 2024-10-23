@@ -72,13 +72,19 @@ public class AwsKmsPqTlsExample {
                 .httpClient(awsCrtHttpClient)
                 .build();
 
-        AcmAsyncClient acmAsyncClient = AcmAsyncClient.builder()
-                .httpClient(awsCrtHttpClient)
-                .build();
+            // Let's add the required providers for this exercise
+            // the regular Bouncy Castle provider for ECDHC
+            Security.addProvider(new BouncyCastleProvider());
+            // the Bouncy Castle post quantum provider for the PQC KEM.
+            Security.addProvider(new BouncyCastlePQCProvider());
 
-        AWSSecretsManagerAsyncClient awsSecretsManagerAsyncClient = AWSSecretsManagerAsyncClient.builder()
-        .httpClient(awsCrtHttpClient)
-        .build();
+            // Generating a key pair for receiver
+            KeyPair keyPair = generateKeyPair();
+
+            System.out.println("KEM Algorithm: " + keyPair.getPublic().getAlgorithm());
+            System.out.println("Public Key length: " + keyPair.getPublic().getEncoded().length);
+            System.out.println("Private Key length: " + keyPair.getPrivate().getEncoded().length);
+
 
         /*
          * Import key material workflow with hybrid post-quantum TLS
@@ -119,8 +125,8 @@ public class AwsKmsPqTlsExample {
          * The plaintextAesKey exists only for the lifetime of this function. This example key material will expire from
          * KMS in 10 minutes. This is the 'validTo(Instant.now().plusSeconds(600))' in the ImportKeyMaterial call below.
          */
-        byte[] plaintextAesKey = new byte[AES_KEY_SIZE_BYTES];
-        SECURE_RANDOM.nextBytes(plaintextAesKey);
+        // byte[] plaintextAesKey = new byte[AES_KEY_SIZE_BYTES];
+        // SECURE_RANDOM.nextBytes(plaintextAesKey);
 
         /*
          * Use the wrapping key to encrypt the local key material. Then use the token to import the wrapped key
@@ -131,7 +137,7 @@ public class AwsKmsPqTlsExample {
          * it could decrypt the RSA-wrapped key to recover your plaintext AES key.
          */
         RSAPublicKey rsaPublicKey = RSAUtils.decodeX509PublicKey(publicKeyBytes);
-        byte[] encryptedAesKey = RSAUtils.encryptRSA(rsaPublicKey, plaintextAesKey);
+        byte[] encryptedAesKey = RSAUtils.encryptRSA(rsaPublicKey, keyPair.getPrivate().getEncoded());
 
         /*
          * Step 4: Import the key material using the CMK ID, wrapped key material, and import token. This is the
